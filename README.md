@@ -36,7 +36,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.box = "ubuntu/focal64"
   
-  config.vm.network "public_network"
+  config.vm.network "forwarded_port", guest: 8000, host: 8000
 
   config.vm.provision "ansible" do |ansible|
     ansible.playbook = "provision.yml"
@@ -44,10 +44,10 @@ Vagrant.configure("2") do |config|
   
 end
 ```
-DHCP den ip alabilmesi için sanal makinenin network ayarı public olarak yapıldı.
+Sanal makinede çalıştırılan portun host makinede erişilebilmesi için ilgili port `guest` parametresine tanımlanır. Host makinede erişilmesi istenilen port ise `host` parametresine tanımlanır. Bu şekilde tanımlanan port, host makinede `localhost` üzerinden erişim sağlanır.
 
 ```ruby
-config.vm.network "public_network"
+config.vm.network "forwarded_port", guest: 8000, host: 8000
 ```
 
 Sanal makineye otomatik yapılandırma sağlamak için Ansible kullanıldı. ansible.playbook ifadesi ile hangi Ansible playbook'unun kullanılacağını belirtir. Bu örnekte, provision.yml isimli playbook belirtildi.
@@ -88,9 +88,14 @@ end
       copy:
         src: ./app/
         dest: /home/vagrant/
+        
+    - name: Start Gunicorn service for Flask application
+      shell: gunicorn --bind 0.0.0.0:8000 app:app
+      args:
+        chdir: /home/vagrant/
 ```
 
-Uygulama python üzerinden geliştirildiğinden ilk olarak çalıştırılacak olan makinede `apt` paket yöneticisi ile `python3` ve `pip` uygulamaları yüklendi. Projenin kullandığı kütüphane ve bağımlılıkları (`flask`, `gunicorn`) için `pip` ile yüklenmesi sağlandı. Son olarak `copy` komutu kullanılarak proje dosyalarının hedef makineye gönderildi.
+Uygulama python üzerinden geliştirildiğinden ilk olarak çalıştırılacak olan makinede `apt` paket yöneticisi ile `python3` ve `pip` uygulamaları yüklendi. Projenin kullandığı kütüphane ve bağımlılıkları (`flask`, `gunicorn`) için `pip` ile yüklenmesi sağlandı. `copy` komutu kullanılarak proje dosyalarının hedef makineye gönderildi. `shell` modülü kullanılarak Gunicorn komutu çalıştırılır. Gunicorn, 0.0.0.0:8000 adresinde dinleme yapar ve uygulama klasörü (/home/vagrant/) altında çalıştırılır. 
 
 Gunicorn, Python uygulamalarının web sunucusu olarak çalıştırılmasını sağlar ve bu durumda bir Flask uygulamasını çalıştırmak için kullanılmaktadır.
 
@@ -101,32 +106,16 @@ Gunicorn, Python uygulamalarının web sunucusu olarak çalıştırılmasını s
     ```
     
     ![](./doc/vm.png)
-
-2. Sanal makineye SSH ile bağlanmak için:
-
-    ```bash
-    vagrant ssh
-    ```
-
-3. Uygulama dizinine gidilerek, uygulama Gunicorn ile çalıştırılır.
-
-   ```bash
-   gunicorn --bind 0.0.0.0:8000 app:app
-   ```
-	--bind 0.0.0.0:8000 Bu, Gunicorn sunucusunun hangi IP adresi ve port üzerinde dinleyeceğini belirtir. app:app Bu, Gunicorn sunucusunun çalıştırılacak uygulamayı belirtir. 
-    
-
-4. Sanal makine ip'sini öğrenmek için `ifconfig` komutu kullanılır. İlgili ip ve port numarası web browser üzerinden girilerek test edilir.
-
+   
     ![Hello World](./doc/app.png)
 
-5. Sanal makineyi kapatmak için:
+2. Sanal makineyi kapatmak için:
 
     ```bash
     vagrant halt
     ```
 
-6. Sanal makinayı tamamen silmek için:
+3. Sanal makinayı tamamen silmek için:
 
     ```bash
     vagrant destroy
